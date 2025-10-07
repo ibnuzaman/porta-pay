@@ -21,7 +21,14 @@ help:
 	@echo "  make up                    - docker-compose up"
 	@echo "  make down                  - docker-compose down -v"
 	@echo "  make logs                  - docker-compose logs -f --tail=200"
+	@echo "  make prepare-migrations    - Install migrate CLI tool (if not installed)"
+	@echo "  make create-migration name=descriptive_name - Create new migration files
 	@echo "  make migrate-up/down       - Run DB migrations for booking (edit DSN/env as needed)"
+	@echo "  make migrate-version       - Show current migration version"
+	@echo "  make migrate-force version=x - Force set migration version to x"
+	@echo "  make migrate-drop          - Drop all tables in the database"
+	@echo "  make migrate-goto version=x - Migrate to specific version x"
+	
 
 # ===== Lint & Test =====
 .PHONY: lint
@@ -53,24 +60,41 @@ docker:
 # ===== Compose =====
 .PHONY: up
 up:
-	docker compose -f deploy/docker-compose.yml up -d --build
+	docker-compose -f deploy/docker-compose.yml up -d --build
 
 .PHONY: down
 down:
-	docker compose -f deploy/docker-compose.yml down -v
+	docker-compose -f deploy/docker-compose.yml down -v
 
 .PHONY: logs
 logs:
-	docker compose -f deploy/docker-compose.yml logs -f --tail=200
+	docker-compose -f deploy/docker-compose.yml logs -f --tail=200
 
 # ===== Migrations (adjust per service if multi-DB) =====
 MIGRATIONS_DIR := services/booking/migrations
 DB_DSN ?= postgres://postgres:postgres@localhost:5432/booking?sslmode=disable
 
+
+.PHONY: prepare-migrations
+prepare-migrations:
+ifndef MIGRATE
+	go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+else
+	@echo "migrate CLI is already installed"
+endif
+
+.PHONY: create-migration
+create-migration:
+ifndef MIGRATE
+	@echo "migrate CLI is not installed. Run 'make prepare-migrations' first."
+else
+	migrate create -ext sql -dir $(MIGRATIONS_DIR) -seq $(name)
+endif
+
 .PHONY: migrate-up
 migrate-up:
 ifndef MIGRATE
-	@echo "migrate CLI not found. Install: https://github.com/golang-migrate/migrate/tree/master/cmd/migrate"
+	@echo "migrate CLI is not installed. Run 'make prepare-migrations' first."
 else
 	migrate -path $(MIGRATIONS_DIR) -database "$(DB_DSN)" up
 endif
@@ -78,7 +102,39 @@ endif
 .PHONY: migrate-down
 migrate-down:
 ifndef MIGRATE
-	@echo "migrate CLI not found. Install: https://github.com/golang-migrate/migrate/tree/master/cmd/migrate"
+	@echo "migrate CLI is not installed. Run 'make prepare-migrations' first."
 else
 	migrate -path $(MIGRATIONS_DIR) -database "$(DB_DSN)" down 1
+endif
+
+.PHONY: migrate-version
+migrate-version:
+ifndef MIGRATE
+	@echo "migrate CLI is not installed. Run 'make prepare-migrations' first."
+else
+	migrate -path $(MIGRATIONS_DIR) -database "$(DB_DSN)" version
+endif
+
+.PHONY: migrate-force
+migrate-force:
+ifndef MIGRATE
+	@echo "migrate CLI is not installed. Run 'make prepare-migrations' first."
+else
+	migrate -path $(MIGRATIONS_DIR) -database "$(DB_DSN)" force $(version)
+endif
+
+.PHONY: migrate-drop
+migrate-drop:
+ifndef MIGRATE
+	@echo "migrate CLI is not installed. Run 'make prepare-migrations' first."
+else
+	migrate -path $(MIGRATIONS_DIR) -database "$(DB_DSN)" drop
+endif
+
+.PHONY: migrate-goto
+migrate-goto:
+ifndef MIGRATE
+	@echo "migrate CLI is not installed. Run 'make prepare-migrations' first."
+else
+	migrate -path $(MIGRATIONS_DIR) -database "$(DB_DSN)" goto $(version)
 endif

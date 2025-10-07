@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,39 +10,37 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/ibnuzaman/porta-pay/pkg/config"
+	"github.com/ibnuzaman/porta-pay/pkg/dbx"
+	"github.com/ibnuzaman/porta-pay/pkg/logx"
+	"github.com/ibnuzaman/porta-pay/pkg/otelx"
 )
 
 func main() {
-	// cfg, err := config.Load()
-	// if err != nil {
-	// 	panic(err)
-	// }
+	cfg, err := config.Load()
+	if err != nil {
+		panic(err)
+	}
 
-	// log := logx.New(cfg.AppName, cfg.Env)
-	// ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	// defer cancel()
+	log := logx.New(cfg.AppName, cfg.Env)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	// shutdownTracer, err := otelx.SetupTracer(ctx, cfg.AppName, cfg.OTLPEndpoint)
-	// defer shutdownTracer(context.Background())
+	shutdownTracer, err := otelx.SetupTracer(ctx, cfg.AppName, cfg.OTLPEndpoint)
+	defer shutdownTracer(context.Background())
 
-	// db := dbx.Open(cfg.PostgresDSN)
-	// defer db.Close()
+	db := dbx.Open(cfg.PostgresDSN)
+	defer db.Close()
 
 	//Wiring
 	// repo := NewBookingRepository(db)
 	// svc := NewBookingService(repo)
 	// h := NewHTTPHandler(svc)
 
-	// r := chi.NewRouter()
-	// r.Use(middleware.RequestID, middleware.RealIP, middleware.Logger, middleware.Recoverer, middleware.Timeout(60*time.Second))
-	// r.Get("/healthz", h.Health)
-	//
-	// r.Get("/readyz", h.Ready)
 	r := setupBasicRouter()
 
 	server := &http.Server{
-		// Addr:         cfg.HTTPAddr,
-		Addr:         ":8080",
+		Addr:         cfg.HTTPAddr,
 		Handler:      r,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
@@ -53,7 +50,7 @@ func main() {
 	go func() {
 		log.Printf("Booking service starting on %s", server.Addr)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Server failed to start: %v", err)
+			log.Fatal()
 		}
 	}()
 
@@ -61,16 +58,6 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-
-	log.Println("Shutting down server...")
-
-	// Graceful shutdown with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	if err := server.Shutdown(ctx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
-	}
 
 	log.Println("Server exited")
 
