@@ -1,4 +1,4 @@
-package dbx
+package database
 
 import (
 	"time"

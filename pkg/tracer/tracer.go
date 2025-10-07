@@ -1,4 +1,4 @@
-package otelx
+package tracer
 
 import (
 	"context"
