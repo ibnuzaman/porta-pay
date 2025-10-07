@@ -1,0 +1,18 @@
+# binaries
+/bin/
+/dist/
+/out/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# go
+coverage.out
+
+# editor
+.idea/
+.vscode/
+
+# env
+.env
